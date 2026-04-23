@@ -9,17 +9,13 @@ import SwiftUI
 
 @main
 struct Household_Chore_RotationApp: App {
-	private let defaultChores = ["Dishes", "Vacuum", "Laundry", "Trash"]
-	@State private var choreStore: ChoreStore
-
-	init() {
-		_choreStore = State(initialValue: ChoreStore(chores: defaultChores))
-	}
+	@State private var choreStore = ChoreStore(chores: [])
 
 	var body: some Scene {
 		WindowGroup {
-			ScreenSelectionView()
-				.environment(choreStore)
+			NavigationStack {
+				HomeView(choreStore: choreStore)
+			}
 		}
 	}
 }

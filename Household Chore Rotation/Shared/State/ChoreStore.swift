@@ -5,20 +5,68 @@
 //  Created by Eric Phung on 4/22/26.
 //
 
+import Foundation
 import Observation
 
 @Observable
 final class ChoreStore {
+	private struct PersistedState: Codable {
+		let chores: [String]
+		let currentIndex: Int
+		let completedIndices: [Int]
+	}
+
+	static let defaultChores = ["Dishes", "Vacuum", "Laundry", "Trash"]
+	private static let storageKey = "ChoreStore.persistedState"
+
 	enum ChoreStatus: String {
 		case pending = "Pending"
-		case inProgress = "In Progress"
 		case completed = "Completed"
 	}
 
-	private let chores: [String]
+	private var chores: [String]
 	private var currentIndex = 0
 	private var completedIndices: Set<Int> = []
-	private var inProgressIndices: Set<Int> = []
+
+	private static func loadPersistedState() -> PersistedState? {
+		guard let data = UserDefaults.standard.data(forKey: storageKey) else {
+			return nil
+		}
+		return try? JSONDecoder().decode(PersistedState.self, from: data)
+	}
+
+	private func persistState() {
+		let state = PersistedState(
+			chores: chores,
+			currentIndex: currentIndex,
+			completedIndices: completedIndices.sorted()
+		)
+		guard let data = try? JSONEncoder().encode(state) else { return }
+		UserDefaults.standard.set(data, forKey: Self.storageKey)
+	}
+
+	private func applyState(
+		chores: [String],
+		currentIndex: Int,
+		completedIndices: [Int]
+	) {
+		self.chores = chores
+		self.currentIndex = currentIndex
+		self.currentIndex = clampedCurrentIndex
+
+		let validIndices = Set(chores.indices)
+		self.completedIndices = Set(completedIndices).intersection(validIndices)
+	}
+
+	private func addChoreInternal(_ chore: String) -> Bool {
+		let trimmedChore = chore.trimmingCharacters(in: .whitespacesAndNewlines)
+		guard !trimmedChore.isEmpty else { return false }
+		chores.append(trimmedChore)
+		if chores.count == 1 {
+			currentIndex = 0
+		}
+		return true
+	}
 
 	private var hasValidCurrentIndex: Bool {
 		chores.indices.contains(currentIndex)
@@ -29,37 +77,53 @@ final class ChoreStore {
 		return min(max(currentIndex, 0), chores.count - 1)
 	}
 
-	private func toggleMembership(in set: inout Set<Int>, for index: Int) {
-		if set.contains(index) {
-			set.remove(index)
-		} else {
-			set.insert(index)
+	private func status(forKnownValidIndex index: Int) -> ChoreStatus {
+		if completedIndices.contains(index) {
+			return .completed
 		}
+		return .pending
+	}
+
+	private func firstNonCompletedIndex() -> Int? {
+		chores.indices.first(where: { !completedIndices.contains($0) })
+	}
+
+	private func nextNonCompletedIndex(after index: Int) -> Int? {
+		chores.indices.first(where: { $0 > index && !completedIndices.contains($0) })
 	}
 
 	var isReset: Bool {
 		chores.isEmpty
-			|| (currentIndex == 0 && completedIndices.isEmpty && inProgressIndices.isEmpty)
+			|| (currentIndex == 0 && completedIndices.isEmpty)
 	}
 
 	init(
 		chores: [String],
 		currentIndex: Int = 0,
-		completedIndices: [Int] = [],
-		inProgressIndices: [Int] = []
+		completedIndices: [Int] = []
 	) {
-		self.chores = chores
-		self.currentIndex = currentIndex
-		self.currentIndex = clampedCurrentIndex
+		self.chores = []
 
-		let validIndices = Set(chores.indices)
-		let completedSet = Set(completedIndices).intersection(validIndices)
-		let inProgressSet = Set(inProgressIndices)
-			.intersection(validIndices)
-			.subtracting(completedSet)
+		let hasExplicitSeed =
+			!chores.isEmpty
+			|| currentIndex != 0
+			|| !completedIndices.isEmpty
 
-		self.completedIndices = completedSet
-		self.inProgressIndices = inProgressSet
+		if !hasExplicitSeed, let persistedState = Self.loadPersistedState() {
+			applyState(
+				chores: persistedState.chores,
+				currentIndex: persistedState.currentIndex,
+				completedIndices: persistedState.completedIndices
+			)
+		} else {
+			applyState(
+				chores: chores,
+				currentIndex: currentIndex,
+				completedIndices: completedIndices
+			)
+		}
+
+		persistState()
 	}
 
 	var allChores: [String] {
@@ -87,10 +151,6 @@ final class ChoreStore {
 		completedIndices.count
 	}
 
-	var inProgressChoreCount: Int {
-		inProgressIndices.count
-	}
-
 	var remainingChoreCount: Int {
 		totalChores - completedChoreCount
 	}
@@ -108,13 +168,12 @@ final class ChoreStore {
 
 	var currentChoreStatus: ChoreStatus {
 		guard hasValidCurrentIndex else { return .pending }
-		if completedIndices.contains(currentIndex) {
-			return .completed
-		}
-		if inProgressIndices.contains(currentIndex) {
-			return .inProgress
-		}
-		return .pending
+		return status(forKnownValidIndex: currentIndex)
+	}
+
+	var currentStatusLabel: String {
+		guard !chores.isEmpty else { return "No status" }
+		return currentChoreStatus.rawValue
 	}
 
 	var statusSummary: String {
@@ -125,19 +184,9 @@ final class ChoreStore {
 		return "\(completedChoreCount) completed, \(remainingChoreCount) remaining"
 	}
 
-	func isChoreCompleted(at index: Int) -> Bool {
-		completedIndices.contains(index)
-	}
-
 	func status(for index: Int) -> ChoreStatus {
 		guard chores.indices.contains(index) else { return .pending }
-		if completedIndices.contains(index) {
-			return .completed
-		}
-		if inProgressIndices.contains(index) {
-			return .inProgress
-		}
-		return .pending
+		return status(forKnownValidIndex: index)
 	}
 
 	func toggleCurrentChoreCompletion() {
@@ -146,78 +195,110 @@ final class ChoreStore {
 			completedIndices.remove(currentIndex)
 		} else {
 			completedIndices.insert(currentIndex)
-			inProgressIndices.remove(currentIndex)
 		}
-	}
-
-	func toggleCurrentChoreInProgress() {
-		guard hasValidCurrentIndex else { return }
-		guard !completedIndices.contains(currentIndex) else { return }
-		toggleMembership(in: &inProgressIndices, for: currentIndex)
+		persistState()
 	}
 
 	func moveToNextNonCompletedChore() {
-		// should find any non-completed chore and move to it, preferably the next one in line. If all chores are completed, stay on current chore.
 		guard !chores.isEmpty else { return }
-		if let nextNonCompleted = chores.indices.first(where: {
-			!completedIndices.contains($0) && $0 > currentIndex
-		}) {
-			currentIndex = nextNonCompleted
-		} else if let firstNonCompleted = chores.indices.first(where: {
-			!completedIndices.contains($0)
-		}) {
-			currentIndex = firstNonCompleted
+		if let targetIndex = nextNonCompletedIndex(after: currentIndex) ?? firstNonCompletedIndex()
+		{
+			currentIndex = targetIndex
 		}
+		persistState()
 	}
 
 	func setCurrentToFirstNonCompletedChore() {
 		guard !chores.isEmpty else {
 			currentIndex = 0
+			persistState()
 			return
 		}
 
-		if let firstNonCompleted = chores.indices.first(where: { !completedIndices.contains($0) }) {
-			currentIndex = firstNonCompleted
-		} else {
-			// If all chores are completed, default to the first chore.
-			currentIndex = 0
-		}
+		currentIndex = firstNonCompletedIndex() ?? 0
+		persistState()
 	}
 
 	func incrementChore() {
 		guard hasValidCurrentIndex else {
 			currentIndex = 0
+			persistState()
 			return
 		}
-		if isLastChore {
+		guard !isLastChore else {
 			return
 		}
 		currentIndex += 1
+		persistState()
 	}
 
 	func decrementChore() {
 		guard hasValidCurrentIndex else {
 			currentIndex = 0
+			persistState()
 			return
 		}
-		if isFirstChore {
+		guard !isFirstChore else {
 			return
 		}
 		currentIndex -= 1
+		persistState()
 	}
 
 	func resetChores() {
 		currentIndex = 0
 		completedIndices.removeAll()
-		inProgressIndices.removeAll()
+		persistState()
 	}
 
-	func clearCompletedChores() {
-		completedIndices.removeAll()
+	func addChore(_ chore: String) {
+		if addChoreInternal(chore) {
+			persistState()
+		}
 	}
 
-	func clearInProgressChores() {
-		inProgressIndices.removeAll()
+	func addChores(_ newChores: [String]) {
+		var didAddAny = false
+		for chore in newChores {
+			if addChoreInternal(chore) {
+				didAddAny = true
+			}
+		}
+		if didAddAny {
+			persistState()
+		}
+	}
+
+	func removeChores(atOffsets offsets: IndexSet) {
+		guard !offsets.isEmpty, !chores.isEmpty else { return }
+
+		let oldCurrentIndex = currentIndex
+		let removedBeforeCurrent = offsets.filter { $0 < oldCurrentIndex }.count
+
+		var combined = chores.indices.map { index in
+			(
+				title: chores[index],
+				isCompleted: completedIndices.contains(index)
+			)
+		}
+
+		combined.remove(atOffsets: offsets)
+
+		chores = combined.map { $0.title }
+		completedIndices = Set(combined.indices.filter { combined[$0].isCompleted })
+
+		if chores.isEmpty {
+			currentIndex = 0
+		} else {
+			currentIndex = min(max(oldCurrentIndex - removedBeforeCurrent, 0), chores.count - 1)
+		}
+
+		persistState()
+	}
+
+	func removeAllChores() {
+		chores.removeAll()
+		resetChores()
 	}
 
 }
