@@ -43,6 +43,16 @@ struct CurrentChoreCardView: View {
 				.font(.system(.title, design: .rounded, weight: .bold))
 				.foregroundStyle(.white)
 
+			if let schedule = choreStore.currentChoreSchedule {
+				Label(schedule.rawValue, systemImage: schedule.systemImage)
+					.font(.caption.weight(.semibold))
+					.foregroundStyle(.white.opacity(0.90))
+					.padding(.horizontal, 10)
+					.padding(.vertical, 4)
+					.background(Color.white.opacity(0.18))
+					.clipShape(Capsule())
+			}
+
 			VStack(alignment: .leading, spacing: 8) {
 				HStack(spacing: 8) {
 					ForEach(paginationItems, id: \.self) { item in
@@ -134,7 +144,12 @@ struct CurrentChoreCardView: View {
 #Preview {
 	CurrentChoreCardView(
 		choreStore: ChoreStore(
-			chores: ["Dishes", "Vacuum", "Laundry", "Trash"],
+			chores: [
+				Chore(title: "Dishes", schedule: .daily),
+				Chore(title: "Vacuum", schedule: .weekly),
+				Chore(title: "Laundry", schedule: .weekly),
+				Chore(title: "Trash", schedule: .weekly),
+			],
 			currentIndex: 1,
 			completedIndices: [0]
 		)

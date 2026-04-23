@@ -23,12 +23,16 @@ struct ChoreListSectionView: View {
 						.background(Color.teal.opacity(0.16))
 						.clipShape(Circle())
 
-					Text(chore)
+					Text(chore.title)
 						.font(.body.weight(.medium))
 					Spacer()
-					Text(choreStore.status(for: index).rawValue)
+					Label(chore.schedule.rawValue, systemImage: chore.schedule.systemImage)
 						.font(.caption.weight(.semibold))
-						.foregroundStyle(.secondary)
+						.foregroundStyle(scheduleColor(for: chore.schedule))
+						.padding(.horizontal, 8)
+						.padding(.vertical, 3)
+						.background(scheduleColor(for: chore.schedule).opacity(0.12))
+						.clipShape(Capsule())
 				}
 				.padding(12)
 				.background(Color.white.opacity(0.82))
@@ -36,12 +40,25 @@ struct ChoreListSectionView: View {
 			}
 		}
 	}
+
+	private func scheduleColor(for schedule: ChoreSchedule) -> Color {
+		switch schedule {
+		case .daily: return .orange
+		case .weekly: return .teal
+		case .monthly: return .purple
+		}
+	}
 }
 
 #Preview {
 	ChoreListSectionView(
 		choreStore: ChoreStore(
-			chores: ["Dishes", "Vacuum", "Laundry", "Trash"],
+			chores: [
+				Chore(title: "Dishes", schedule: .daily),
+				Chore(title: "Vacuum", schedule: .weekly),
+				Chore(title: "Laundry", schedule: .weekly),
+				Chore(title: "Deep Clean", schedule: .monthly),
+			],
 			currentIndex: 1,
 			completedIndices: [0]
 		)

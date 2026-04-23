@@ -71,7 +71,12 @@ struct ChoreActionsView: View {
 #Preview {
 	ChoreActionsView(
 		choreStore: ChoreStore(
-			chores: ["Dishes", "Vacuum", "Laundry", "Trash"],
+			chores: [
+				Chore(title: "Dishes", schedule: .daily),
+				Chore(title: "Vacuum", schedule: .weekly),
+				Chore(title: "Laundry", schedule: .weekly),
+				Chore(title: "Trash", schedule: .weekly),
+			],
 			currentIndex: 1,
 			completedIndices: [0]
 		)

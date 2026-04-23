@@ -11,12 +11,24 @@ import Observation
 @Observable
 final class ChoreStore {
 	private struct PersistedState: Codable {
+		let chores: [Chore]
+		let currentIndex: Int
+		let completedIndices: [Int]
+	}
+
+	/// Legacy format used before schedule support was added.
+	private struct LegacyPersistedState: Codable {
 		let chores: [String]
 		let currentIndex: Int
 		let completedIndices: [Int]
 	}
 
-	static let defaultChores = ["Dishes", "Vacuum", "Laundry", "Trash"]
+	static let defaultChores: [Chore] = [
+		Chore(title: "Dishes", schedule: .daily),
+		Chore(title: "Vacuum", schedule: .weekly),
+		Chore(title: "Laundry", schedule: .weekly),
+		Chore(title: "Trash", schedule: .weekly),
+	]
 	private static let storageKey = "ChoreStore.persistedState"
 
 	enum ChoreStatus: String {
@@ -24,7 +36,7 @@ final class ChoreStore {
 		case completed = "Completed"
 	}
 
-	private var chores: [String]
+	private var chores: [Chore]
 	private var currentIndex = 0
 	private var completedIndices: Set<Int> = []
 
@@ -32,7 +44,18 @@ final class ChoreStore {
 		guard let data = UserDefaults.standard.data(forKey: storageKey) else {
 			return nil
 		}
-		return try? JSONDecoder().decode(PersistedState.self, from: data)
+		if let state = try? JSONDecoder().decode(PersistedState.self, from: data) {
+			return state
+		}
+		// Migrate from legacy format (chores stored as plain strings).
+		if let legacy = try? JSONDecoder().decode(LegacyPersistedState.self, from: data) {
+			return PersistedState(
+				chores: legacy.chores.map { Chore(title: $0, schedule: .weekly) },
+				currentIndex: legacy.currentIndex,
+				completedIndices: legacy.completedIndices
+			)
+		}
+		return nil
 	}
 
 	private func persistState() {
@@ -46,7 +69,7 @@ final class ChoreStore {
 	}
 
 	private func applyState(
-		chores: [String],
+		chores: [Chore],
 		currentIndex: Int,
 		completedIndices: [Int]
 	) {
@@ -58,10 +81,10 @@ final class ChoreStore {
 		self.completedIndices = Set(completedIndices).intersection(validIndices)
 	}
 
-	private func addChoreInternal(_ chore: String) -> Bool {
-		let trimmedChore = chore.trimmingCharacters(in: .whitespacesAndNewlines)
-		guard !trimmedChore.isEmpty else { return false }
-		chores.append(trimmedChore)
+	private func addChoreInternal(_ chore: Chore) -> Bool {
+		let trimmedTitle = chore.title.trimmingCharacters(in: .whitespacesAndNewlines)
+		guard !trimmedTitle.isEmpty else { return false }
+		chores.append(Chore(title: trimmedTitle, schedule: chore.schedule))
 		if chores.count == 1 {
 			currentIndex = 0
 		}
@@ -98,7 +121,7 @@ final class ChoreStore {
 	}
 
 	init(
-		chores: [String],
+		chores: [Chore],
 		currentIndex: Int = 0,
 		completedIndices: [Int] = []
 	) {
@@ -126,7 +149,7 @@ final class ChoreStore {
 		persistState()
 	}
 
-	var allChores: [String] {
+	var allChores: [Chore] {
 		chores
 	}
 
@@ -159,11 +182,17 @@ final class ChoreStore {
 		totalChores > 0 && completedChoreCount == totalChores
 	}
 
-	var currentChore: String {
-		guard hasValidCurrentIndex else {
-			return "No chores available"
-		}
+	var currentChoreItem: Chore? {
+		guard hasValidCurrentIndex else { return nil }
 		return chores[currentIndex]
+	}
+
+	var currentChore: String {
+		currentChoreItem?.title ?? "No chores available"
+	}
+
+	var currentChoreSchedule: ChoreSchedule? {
+		currentChoreItem?.schedule
 	}
 
 	var currentChoreStatus: ChoreStatus {
@@ -251,13 +280,13 @@ final class ChoreStore {
 		persistState()
 	}
 
-	func addChore(_ chore: String) {
+	func addChore(_ chore: Chore) {
 		if addChoreInternal(chore) {
 			persistState()
 		}
 	}
 
-	func addChores(_ newChores: [String]) {
+	func addChores(_ newChores: [Chore]) {
 		var didAddAny = false
 		for chore in newChores {
 			if addChoreInternal(chore) {
@@ -277,14 +306,14 @@ final class ChoreStore {
 
 		var combined = chores.indices.map { index in
 			(
-				title: chores[index],
+				chore: chores[index],
 				isCompleted: completedIndices.contains(index)
 			)
 		}
 
 		combined.remove(atOffsets: offsets)
 
-		chores = combined.map { $0.title }
+		chores = combined.map { $0.chore }
 		completedIndices = Set(combined.indices.filter { combined[$0].isCompleted })
 
 		if chores.isEmpty {

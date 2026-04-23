@@ -10,7 +10,9 @@ import SwiftUI
 struct AddChoresView: View {
 	@Bindable var choreStore: ChoreStore
 	@State private var newChore = ""
+	@State private var selectedSchedule: ChoreSchedule = .weekly
 	@State private var bulkInput = ""
+	@State private var bulkSchedule: ChoreSchedule = .weekly
 
 	var body: some View {
 		Form {
@@ -22,6 +24,13 @@ struct AddChoresView: View {
 						addSingleChore()
 					}
 
+				Picker("Schedule", selection: $selectedSchedule) {
+					ForEach(ChoreSchedule.allCases, id: \.self) { schedule in
+						Label(schedule.rawValue, systemImage: schedule.systemImage)
+							.tag(schedule)
+					}
+				}
+
 				Button("Add Chore") {
 					addSingleChore()
 				}
@@ -32,11 +41,18 @@ struct AddChoresView: View {
 				TextEditor(text: $bulkInput)
 					.frame(minHeight: 110)
 
+				Picker("Schedule", selection: $bulkSchedule) {
+					ForEach(ChoreSchedule.allCases, id: \.self) { schedule in
+						Label(schedule.rawValue, systemImage: schedule.systemImage)
+							.tag(schedule)
+					}
+				}
+
 				Button("Add From Lines") {
 					let chores =
 						bulkInput
 						.split(whereSeparator: \.isNewline)
-						.map { String($0) }
+						.map { Chore(title: String($0), schedule: bulkSchedule) }
 					choreStore.addChores(chores)
 					bulkInput = ""
 				}
@@ -57,7 +73,11 @@ struct AddChoresView: View {
 						HStack {
 							Text("\(index + 1).")
 								.foregroundStyle(.secondary)
-							Text(chore)
+							Text(chore.title)
+							Spacer()
+							Label(chore.schedule.rawValue, systemImage: chore.schedule.systemImage)
+								.font(.caption)
+								.foregroundStyle(.secondary)
 						}
 					}
 					.onDelete { offsets in
@@ -96,13 +116,13 @@ struct AddChoresView: View {
 	}
 
 	private func addSingleChore() {
-		choreStore.addChore(newChore)
+		choreStore.addChore(Chore(title: newChore, schedule: selectedSchedule))
 		newChore = ""
 	}
 }
 
 #Preview {
 	NavigationStack {
-		AddChoresView(choreStore: ChoreStore(chores: ["Dishes", "Vacuum"]))
+		AddChoresView(choreStore: ChoreStore(chores: [Chore(title: "Dishes", schedule: .daily), Chore(title: "Vacuum", schedule: .weekly)]))
 	}
 }
