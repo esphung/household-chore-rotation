@@ -10,6 +10,7 @@ import SwiftUI
 struct RootView: View {
 	@State private var path: [AppRoute] = []
 	@State private var choreStore = ChoreStore(chores: [])
+	@Environment(\.scenePhase) private var scenePhase
 
 	var body: some View {
 		NavigationStack(path: $path) {
@@ -28,6 +29,11 @@ struct RootView: View {
 						}
 					}
 				}
+		}
+		.onChange(of: scenePhase) { _, newPhase in
+			if newPhase == .active {
+				choreStore.checkAndResetExpiredChores()
+			}
 		}
 	}
 }

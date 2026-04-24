@@ -127,7 +127,11 @@ final class ChoreStore {
 	}
 
 	private func status(forKnownValidIndex index: Int) -> ChoreStatus {
-		completedIndices.contains(index) ? .completed : .pending
+		guard completedIndices.contains(index) else { return .pending }
+		if let nextDueAt = chores[index].nextDueAt, nextDueAt <= Date() {
+			return .pending
+		}
+		return .completed
 	}
 
 	private func firstNonCompletedIndex() -> Int? {
@@ -172,6 +176,7 @@ final class ChoreStore {
 		}
 
 		persistState()
+		checkAndResetExpiredChores()
 	}
 
 	var allChores: [Chore] {
@@ -247,8 +252,13 @@ final class ChoreStore {
 		guard hasValidCurrentIndex else { return }
 		if completedIndices.contains(currentIndex) {
 			completedIndices.remove(currentIndex)
+			chores[currentIndex].lastCompletedAt = nil
+			chores[currentIndex].nextDueAt = nil
 		} else {
+			let now = Date()
 			completedIndices.insert(currentIndex)
+			chores[currentIndex].lastCompletedAt = now
+			chores[currentIndex].nextDueAt = chores[currentIndex].schedule.nextDueDate(from: now)
 		}
 		persistState()
 	}
@@ -334,6 +344,22 @@ final class ChoreStore {
 	func removeAllChores() {
 		chores.removeAll()
 		resetChores()
+	}
+
+	func checkAndResetExpiredChores(now: Date = Date()) {
+		let expiredIndices = completedIndices.filter { index in
+			guard chores.indices.contains(index),
+				let nextDueAt = chores[index].nextDueAt
+			else { return false }
+			return nextDueAt <= now
+		}
+		guard !expiredIndices.isEmpty else { return }
+		for index in expiredIndices {
+			completedIndices.remove(index)
+			chores[index].lastCompletedAt = nil
+			chores[index].nextDueAt = nil
+		}
+		persistState()
 	}
 
 }

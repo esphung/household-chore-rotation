@@ -40,6 +40,13 @@ struct ChoreDetailView: View {
 		liveChore?.schedule.badgeColor ?? .gray
 	}
 
+	private static let dateFormatter: DateFormatter = {
+		let f = DateFormatter()
+		f.dateStyle = .medium
+		f.timeStyle = .short
+		return f
+	}()
+
 	private var detailCard: some View {
 		VStack(alignment: .leading, spacing: 14) {
 			if let liveChore {
@@ -63,6 +70,22 @@ struct ChoreDetailView: View {
 					textColor: scheduleBadgeColor,
 					backgroundColor: scheduleBadgeColor.opacity(0.14)
 				)
+
+				if let lastCompletedAt = liveChore.lastCompletedAt {
+					ThemedText(
+						"Last completed: \(Self.dateFormatter.string(from: lastCompletedAt))",
+						type: .caption,
+						style: .secondary
+					)
+				}
+
+				if let nextDueAt = liveChore.nextDueAt {
+					ThemedText(
+						"Resets: \(Self.dateFormatter.string(from: nextDueAt))",
+						type: .caption,
+						style: .secondary
+					)
+				}
 
 				if let choreIndex {
 					ThemedText(

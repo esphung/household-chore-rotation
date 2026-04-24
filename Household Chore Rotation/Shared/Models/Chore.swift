@@ -41,17 +41,29 @@ struct Chore: Codable, Equatable, Identifiable {
 	var id: UUID
 	var title: String
 	var schedule: ChoreSchedule
+	var lastCompletedAt: Date?
+	var nextDueAt: Date?
 
-	init(id: UUID = UUID(), title: String, schedule: ChoreSchedule = .weekly) {
+	init(
+		id: UUID = UUID(),
+		title: String,
+		schedule: ChoreSchedule = .weekly,
+		lastCompletedAt: Date? = nil,
+		nextDueAt: Date? = nil
+	) {
 		self.id = id
 		self.title = title
 		self.schedule = schedule
+		self.lastCompletedAt = lastCompletedAt
+		self.nextDueAt = nextDueAt
 	}
 
 	private enum CodingKeys: String, CodingKey {
 		case id
 		case title
 		case schedule
+		case lastCompletedAt
+		case nextDueAt
 	}
 
 	init(from decoder: Decoder) throws {
@@ -59,6 +71,8 @@ struct Chore: Codable, Equatable, Identifiable {
 		id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
 		title = try container.decode(String.self, forKey: .title)
 		schedule = try container.decode(ChoreSchedule.self, forKey: .schedule)
+		lastCompletedAt = try container.decodeIfPresent(Date.self, forKey: .lastCompletedAt)
+		nextDueAt = try container.decodeIfPresent(Date.self, forKey: .nextDueAt)
 	}
 
 	func encode(to encoder: Encoder) throws {
@@ -66,5 +80,7 @@ struct Chore: Codable, Equatable, Identifiable {
 		try container.encode(id, forKey: .id)
 		try container.encode(title, forKey: .title)
 		try container.encode(schedule, forKey: .schedule)
+		try container.encodeIfPresent(lastCompletedAt, forKey: .lastCompletedAt)
+		try container.encodeIfPresent(nextDueAt, forKey: .nextDueAt)
 	}
 }
