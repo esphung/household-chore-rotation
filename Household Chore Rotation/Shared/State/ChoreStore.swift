@@ -11,12 +11,42 @@ import Observation
 @Observable
 final class ChoreStore {
 	private struct PersistedState: Codable {
-		let chores: [String]
+		let chores: [Chore]
 		let currentIndex: Int
 		let completedIndices: [Int]
+		let selectedSchedule: ChoreSchedule
+
+		private enum CodingKeys: String, CodingKey {
+			case chores
+			case currentIndex
+			case completedIndices
+			case selectedSchedule
+		}
+
+		init(
+			chores: [Chore],
+			currentIndex: Int,
+			completedIndices: [Int],
+			selectedSchedule: ChoreSchedule
+		) {
+			self.chores = chores
+			self.currentIndex = currentIndex
+			self.completedIndices = completedIndices
+			self.selectedSchedule = selectedSchedule
+		}
+
+		init(from decoder: Decoder) throws {
+			let container = try decoder.container(keyedBy: CodingKeys.self)
+			chores = try container.decode([Chore].self, forKey: .chores)
+			currentIndex = try container.decode(Int.self, forKey: .currentIndex)
+			completedIndices = try container.decode([Int].self, forKey: .completedIndices)
+			selectedSchedule =
+				try container.decodeIfPresent(ChoreSchedule.self, forKey: .selectedSchedule)
+				?? .daily
+		}
 	}
 
-	static let defaultChores = ["Dishes", "Vacuum", "Laundry", "Trash"]
+	private static let defaultChoreTitles = ["Dishes", "Vacuum", "Laundry", "Trash"]
 	private static let storageKey = "ChoreStore.persistedState"
 
 	enum ChoreStatus: String {
@@ -24,9 +54,31 @@ final class ChoreStore {
 		case completed = "Completed"
 	}
 
-	private var chores: [String]
+	var selectedSchedule: ChoreSchedule = .daily {
+		didSet {
+			persistState()
+		}
+	}
+
+	private var chores: [Chore]
 	private var currentIndex = 0
 	private var completedIndices: Set<Int> = []
+
+	private var persistedState: PersistedState {
+		PersistedState(
+			chores: chores,
+			currentIndex: currentIndex,
+			completedIndices: completedIndices.sorted(),
+			selectedSchedule: selectedSchedule
+		)
+	}
+
+	func addDefaultChores() {
+		let defaultChores = Self.defaultChoreTitles.map {
+			Chore(title: $0, schedule: selectedSchedule)
+		}
+		addChores(defaultChores)
+	}
 
 	private static func loadPersistedState() -> PersistedState? {
 		guard let data = UserDefaults.standard.data(forKey: storageKey) else {
@@ -36,19 +88,15 @@ final class ChoreStore {
 	}
 
 	private func persistState() {
-		let state = PersistedState(
-			chores: chores,
-			currentIndex: currentIndex,
-			completedIndices: completedIndices.sorted()
-		)
-		guard let data = try? JSONEncoder().encode(state) else { return }
+		guard let data = try? JSONEncoder().encode(persistedState) else { return }
 		UserDefaults.standard.set(data, forKey: Self.storageKey)
 	}
 
 	private func applyState(
-		chores: [String],
+		chores: [Chore],
 		currentIndex: Int,
-		completedIndices: [Int]
+		completedIndices: [Int],
+		selectedSchedule: ChoreSchedule
 	) {
 		self.chores = chores
 		self.currentIndex = currentIndex
@@ -56,12 +104,13 @@ final class ChoreStore {
 
 		let validIndices = Set(chores.indices)
 		self.completedIndices = Set(completedIndices).intersection(validIndices)
+		self.selectedSchedule = selectedSchedule
 	}
 
-	private func addChoreInternal(_ chore: String) -> Bool {
-		let trimmedChore = chore.trimmingCharacters(in: .whitespacesAndNewlines)
-		guard !trimmedChore.isEmpty else { return false }
-		chores.append(trimmedChore)
+	private func addChoreInternal(_ chore: Chore) -> Bool {
+		let trimmedTitle = chore.title.trimmingCharacters(in: .whitespacesAndNewlines)
+		guard !trimmedTitle.isEmpty else { return false }
+		chores.append(Chore(title: trimmedTitle, schedule: chore.schedule))
 		if chores.count == 1 {
 			currentIndex = 0
 		}
@@ -78,10 +127,7 @@ final class ChoreStore {
 	}
 
 	private func status(forKnownValidIndex index: Int) -> ChoreStatus {
-		if completedIndices.contains(index) {
-			return .completed
-		}
-		return .pending
+		completedIndices.contains(index) ? .completed : .pending
 	}
 
 	private func firstNonCompletedIndex() -> Int? {
@@ -94,11 +140,11 @@ final class ChoreStore {
 
 	var isReset: Bool {
 		chores.isEmpty
-			|| (currentIndex == 0 && completedIndices.isEmpty)
+			|| (currentIndex == 0 && completedIndices.isEmpty && selectedSchedule == .daily)
 	}
 
 	init(
-		chores: [String],
+		chores: [Chore],
 		currentIndex: Int = 0,
 		completedIndices: [Int] = []
 	) {
@@ -113,20 +159,22 @@ final class ChoreStore {
 			applyState(
 				chores: persistedState.chores,
 				currentIndex: persistedState.currentIndex,
-				completedIndices: persistedState.completedIndices
+				completedIndices: persistedState.completedIndices,
+				selectedSchedule: persistedState.selectedSchedule
 			)
 		} else {
 			applyState(
 				chores: chores,
 				currentIndex: currentIndex,
-				completedIndices: completedIndices
+				completedIndices: completedIndices,
+				selectedSchedule: .daily
 			)
 		}
 
 		persistState()
 	}
 
-	var allChores: [String] {
+	var allChores: [Chore] {
 		chores
 	}
 
@@ -159,11 +207,17 @@ final class ChoreStore {
 		totalChores > 0 && completedChoreCount == totalChores
 	}
 
-	var currentChore: String {
-		guard hasValidCurrentIndex else {
-			return "No chores available"
-		}
+	var currentChoreItem: Chore? {
+		guard hasValidCurrentIndex else { return nil }
 		return chores[currentIndex]
+	}
+
+	var currentChore: String {
+		currentChoreItem?.title ?? "No chores available"
+	}
+
+	var currentChoreSchedule: ChoreSchedule? {
+		currentChoreItem?.schedule
 	}
 
 	var currentChoreStatus: ChoreStatus {
@@ -199,26 +253,6 @@ final class ChoreStore {
 		persistState()
 	}
 
-	func moveToNextNonCompletedChore() {
-		guard !chores.isEmpty else { return }
-		if let targetIndex = nextNonCompletedIndex(after: currentIndex) ?? firstNonCompletedIndex()
-		{
-			currentIndex = targetIndex
-		}
-		persistState()
-	}
-
-	func setCurrentToFirstNonCompletedChore() {
-		guard !chores.isEmpty else {
-			currentIndex = 0
-			persistState()
-			return
-		}
-
-		currentIndex = firstNonCompletedIndex() ?? 0
-		persistState()
-	}
-
 	func incrementChore() {
 		guard hasValidCurrentIndex else {
 			currentIndex = 0
@@ -248,16 +282,17 @@ final class ChoreStore {
 	func resetChores() {
 		currentIndex = 0
 		completedIndices.removeAll()
+		selectedSchedule = .daily
 		persistState()
 	}
 
-	func addChore(_ chore: String) {
+	func addChore(_ chore: Chore) {
 		if addChoreInternal(chore) {
 			persistState()
 		}
 	}
 
-	func addChores(_ newChores: [String]) {
+	func addChores(_ newChores: [Chore]) {
 		var didAddAny = false
 		for chore in newChores {
 			if addChoreInternal(chore) {
@@ -277,14 +312,14 @@ final class ChoreStore {
 
 		var combined = chores.indices.map { index in
 			(
-				title: chores[index],
+				chore: chores[index],
 				isCompleted: completedIndices.contains(index)
 			)
 		}
 
 		combined.remove(atOffsets: offsets)
 
-		chores = combined.map { $0.title }
+		chores = combined.map { $0.chore }
 		completedIndices = Set(combined.indices.filter { combined[$0].isCompleted })
 
 		if chores.isEmpty {

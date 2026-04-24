@@ -14,9 +14,6 @@ struct ChoreActionsView: View {
 		VStack(spacing: 10) {
 			Button {
 				choreStore.toggleCurrentChoreCompletion()
-				if choreStore.currentChoreStatus == .completed {
-					choreStore.moveToNextNonCompletedChore()
-				}
 			} label: {
 				Label(
 					choreStore.currentChoreStatus == .completed
@@ -71,7 +68,12 @@ struct ChoreActionsView: View {
 #Preview {
 	ChoreActionsView(
 		choreStore: ChoreStore(
-			chores: ["Dishes", "Vacuum", "Laundry", "Trash"],
+			chores: [
+				Chore(title: "Dishes", schedule: .daily),
+				Chore(title: "Vacuum", schedule: .weekly),
+				Chore(title: "Laundry", schedule: .weekly),
+				Chore(title: "Trash", schedule: .weekly),
+			],
 			currentIndex: 1,
 			completedIndices: [0]
 		)
