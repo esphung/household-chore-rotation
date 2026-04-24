@@ -47,7 +47,7 @@ struct AlertActionButton: View {
 			Button(confirmButtonTitle, action: onConfirm)
 		} message: {
 			if let alertMessage {
-				Text(alertMessage)
+				ThemedText(alertMessage, type: .body)
 			}
 		}
 	}
@@ -57,7 +57,7 @@ struct AlertActionButton: View {
 		if let systemImage {
 			Label(buttonTitle, systemImage: systemImage)
 		} else {
-			Text(buttonTitle)
+			ThemedText(buttonTitle, type: .body)
 		}
 	}
 }

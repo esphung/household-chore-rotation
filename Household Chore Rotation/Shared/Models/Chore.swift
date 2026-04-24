@@ -2,7 +2,7 @@
 //  Chore.swift
 //  Household Chore Rotation
 //
-//  Created by GitHub Copilot on 4/23/26.
+//  Created by Eric Phung on 4/23/26.
 //
 
 import Foundation
@@ -37,12 +37,34 @@ enum ChoreSchedule: String, Codable, CaseIterable {
 	}
 }
 
-struct Chore: Codable, Equatable {
+struct Chore: Codable, Equatable, Identifiable {
+	var id: UUID
 	var title: String
 	var schedule: ChoreSchedule
 
-	init(title: String, schedule: ChoreSchedule = .weekly) {
+	init(id: UUID = UUID(), title: String, schedule: ChoreSchedule = .weekly) {
+		self.id = id
 		self.title = title
 		self.schedule = schedule
+	}
+
+	private enum CodingKeys: String, CodingKey {
+		case id
+		case title
+		case schedule
+	}
+
+	init(from decoder: Decoder) throws {
+		let container = try decoder.container(keyedBy: CodingKeys.self)
+		id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+		title = try container.decode(String.self, forKey: .title)
+		schedule = try container.decode(ChoreSchedule.self, forKey: .schedule)
+	}
+
+	func encode(to encoder: Encoder) throws {
+		var container = encoder.container(keyedBy: CodingKeys.self)
+		try container.encode(id, forKey: .id)
+		try container.encode(title, forKey: .title)
+		try container.encode(schedule, forKey: .schedule)
 	}
 }

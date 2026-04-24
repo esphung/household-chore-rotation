@@ -21,6 +21,46 @@ struct CurrentChoreCardView: View {
 		endPoint: .bottomTrailing
 	)
 
+	private var currentChore: Chore? {
+		choreStore.currentChoreItem
+	}
+
+	private var choreIndex: Int? {
+		guard let currentChore else { return nil }
+		return choreStore.allChores.firstIndex(where: { $0.id == currentChore.id })
+	}
+
+	private var currentChoreStatus: ChoreStore.ChoreStatus? {
+		guard let choreIndex else { return nil }
+		return choreStore.status(for: choreIndex)
+	}
+
+	private var choreStatusText: String {
+		currentChoreStatus?.rawValue ?? "Unknown"
+	}
+
+	private var choreStatusColor: Color {
+		currentChoreStatus?.cardBadgeColor ?? .gray
+	}
+
+	private var choreStatusBackgroundColor: Color {
+		choreStatusColor.opacity(0.24)
+	}
+
+	@ViewBuilder
+	private var currentScheduleBadge: some View {
+		if let schedule = currentChore?.schedule {
+			ThemedText(
+				schedule.rawValue,
+				systemImage: schedule.systemImage,
+				type: .captionSemibold,
+				style: .inversePrimaryBadge
+			)
+		} else {
+			Color.clear
+		}
+	}
+
 	var body: some View {
 		VStack(alignment: .leading, spacing: 18) {
 			HStack {
@@ -28,30 +68,31 @@ struct CurrentChoreCardView: View {
 					.font(.headline)
 					.foregroundStyle(.white.opacity(0.95))
 				Spacer()
-				Text(choreStore.currentStatusLabel)
-					.font(.caption.weight(.semibold))
-					.padding(.horizontal, 10)
-					.padding(.vertical, 4)
-					.background(Color.white.opacity(0.20))
-					.clipShape(Capsule())
-				Text("\(choreStore.currentPosition) of \(choreStore.totalChores)")
-					.font(.caption.weight(.semibold))
-					.foregroundStyle(.white.opacity(0.85))
+				if let currentChore {
+					ChoreDetailNavigationBadge(
+						chore: currentChore, badgeColor: .white
+					) { selectedChore in
+						ChoreDetailView(choreStore: choreStore, chore: selectedChore)
+					}
+
+					ThemedText(
+						choreStatusText,
+						type: .captionSemibold
+					)
+					.badgeStyle(
+						textColor: choreStatusColor,
+						backgroundColor: choreStatusBackgroundColor
+					)
+					.frame(width: 92)
+				}
+
 			}
 
-			Text(choreStore.currentChore)
-				.font(.system(.title, design: .rounded, weight: .bold))
-				.foregroundStyle(.white)
+			ThemedText(choreStore.currentChore, type: .cardTitle, style: .inversePrimary)
+				.lineLimit(2, reservesSpace: true)
 
-			if let schedule = choreStore.currentChoreSchedule {
-				Label(schedule.rawValue, systemImage: schedule.systemImage)
-					.font(.caption.weight(.semibold))
-					.foregroundStyle(.white.opacity(0.90))
-					.padding(.horizontal, 10)
-					.padding(.vertical, 4)
-					.background(Color.white.opacity(0.18))
-					.clipShape(Capsule())
-			}
+			currentScheduleBadge
+				.frame(height: 24, alignment: .leading)
 
 			VStack(alignment: .leading, spacing: 8) {
 				HStack(spacing: 8) {
@@ -73,13 +114,17 @@ struct CurrentChoreCardView: View {
 				}
 				.frame(maxWidth: .infinity, alignment: .center)
 
-				Text("Chore \(choreStore.currentPosition) of \(choreStore.totalChores)")
-					.font(.caption)
-					.foregroundStyle(.white.opacity(0.85))
+				ThemedText(
+					"Chore \(choreStore.currentPosition) of \(choreStore.totalChores)",
+					type: .caption,
+					style: .inverseSecondary
+				)
 
-				Text(choreStore.statusSummary)
-					.font(.caption)
-					.foregroundStyle(.white.opacity(0.9))
+				ThemedText(
+					choreStore.statusSummary,
+					type: .caption,
+					style: .custom(AnyShapeStyle(.white.opacity(0.9)))
+				)
 			}
 		}
 		.padding(18)
@@ -93,14 +138,10 @@ struct CurrentChoreCardView: View {
 		if index == currentChoreIndex {
 			return .white
 		}
-		if status(for: index) == .completed {
+		if choreStore.status(for: index) == .completed {
 			return .green.opacity(0.9)
 		}
 		return .white.opacity(0.28)
-	}
-
-	private func status(for index: Int) -> ChoreStore.ChoreStatus {
-		choreStore.status(for: index)
 	}
 
 	private var currentChoreIndex: Int {

@@ -10,42 +10,55 @@ import SwiftUI
 struct ChoreListSectionView: View {
 	@Bindable var choreStore: ChoreStore
 
-	var body: some View {
-		VStack(alignment: .leading, spacing: 12) {
-			Text("All Chores")
-				.font(.headline)
+	private var indexedChores: [(offset: Int, element: Chore)] {
+		Array(choreStore.allChores.enumerated())
+	}
 
-			ForEach(Array(choreStore.allChores.enumerated()), id: \.offset) { index, chore in
-				HStack(spacing: 12) {
-					Text("\(index + 1)")
-						.font(.caption.weight(.bold))
-						.frame(width: 24, height: 24)
-						.background(Color.teal.opacity(0.16))
-						.clipShape(Circle())
+	private func choreRow(index: Int, chore: Chore) -> some View {
+		HStack(spacing: 12) {
+			rowNumberBadge(index: index)
+			ThemedText(chore.title, type: .bodyMedium)
+			Spacer()
+			rowTrailingContent(for: chore)
+		}
+		.padding(12)
+		.background(Color.white.opacity(0.82))
+		.clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+	}
 
-					Text(chore.title)
-						.font(.body.weight(.medium))
-					Spacer()
-					Label(chore.schedule.rawValue, systemImage: chore.schedule.systemImage)
-						.font(.caption.weight(.semibold))
-						.foregroundStyle(scheduleColor(for: chore.schedule))
-						.padding(.horizontal, 8)
-						.padding(.vertical, 3)
-						.background(scheduleColor(for: chore.schedule).opacity(0.12))
-						.clipShape(Capsule())
-				}
-				.padding(12)
-				.background(Color.white.opacity(0.82))
-				.clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+	private func rowNumberBadge(index: Int) -> some View {
+		ThemedText("\(index + 1)", type: .captionBold)
+			.frame(width: 24, height: 24)
+			.background(Color.teal.opacity(0.16))
+			.clipShape(Circle())
+	}
+
+	private func rowTrailingContent(for chore: Chore) -> some View {
+		HStack(spacing: 8) {
+			ChoreDetailNavigationBadge(chore: chore) { selectedChore in
+				ChoreDetailView(choreStore: choreStore, chore: selectedChore)
 			}
+
+			ThemedText(
+				chore.schedule.rawValue,
+				systemImage: chore.schedule.systemImage,
+				type: .captionSemibold
+			)
+			.badgeStyle(
+				textColor: chore.schedule.badgeColor,
+				backgroundColor: chore.schedule.badgeColor.opacity(0.12)
+			)
+			.frame(minWidth: 92)
 		}
 	}
 
-	private func scheduleColor(for schedule: ChoreSchedule) -> Color {
-		switch schedule {
-		case .daily: return .orange
-		case .weekly: return .teal
-		case .monthly: return .purple
+	var body: some View {
+		VStack(alignment: .leading, spacing: 12) {
+			ThemedText("All Chores", type: .sectionTitle)
+
+			ForEach(indexedChores, id: \.offset) { index, chore in
+				choreRow(index: index, chore: chore)
+			}
 		}
 	}
 }
