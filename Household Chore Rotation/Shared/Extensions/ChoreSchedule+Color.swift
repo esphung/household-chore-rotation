@@ -8,14 +8,14 @@
 import SwiftUI
 
 extension ChoreSchedule {
-	var badgeColor: Color {
-		switch self {
-		case .daily:
-			return .orange
-		case .weekly:
-			return .teal
-		case .monthly:
-			return .purple
+		var badgeColor: Color {
+				switch self {
+				case .daily:
+						return .orange
+				case .weekly:
+						return .teal
+				case .monthly:
+						return .purple
+				}
 		}
-	}
 }

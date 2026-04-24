@@ -1,0 +1,118 @@
+name: Test
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  setup:
+    name: Setup
+    runs-on: macos-latest
+    outputs:
+      gems-path: ${{ steps.set-up-homebrew.outputs.gems-path }}
+      gems-hash: ${{ steps.set-up-homebrew.outputs.gems-hash }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@main
+
+  lint:
+    name: Lint
+    runs-on: macos-latest
+    needs: setup
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Homebrew Bundler RubyGems
+        id: cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ needs.setup.outputs.gems-path }}
+          key: ${{ runner.os }}-rubygems-${{ needs.setup.outputs.gems-hash }}
+          restore-keys: ${{ runner.os }}-rubygems-
+
+      - name: Install Homebrew Bundler RubyGems
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: brew install-bundler-gems
+
+      - name: Install Homebrew dependencies
+        run: env HOMEBREW_NO_AUTO_UPDATE=1 brew bundle
+
+      - name: Run SwiftLint
+        shell: bash
+        run: sh ./.scripts/lint.sh
+
+  format:
+    name: Swift-Format Check
+    runs-on: macos-latest
+    needs: setup
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Homebrew Bundler RubyGems
+        id: cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ needs.setup.outputs.gems-path }}
+          key: ${{ runner.os }}-rubygems-${{ needs.setup.outputs.gems-hash }}
+          restore-keys: ${{ runner.os }}-rubygems-
+
+      - name: Install Homebrew Bundler RubyGems
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: brew install-bundler-gems
+
+      - name: Install Homebrew dependencies
+        run: env HOMEBREW_NO_AUTO_UPDATE=1 brew bundle
+
+      - name: Run Swift-Format Check
+        shell: bash
+        run: sh ./.scripts/swift-format-check.sh
+
+  tests:
+    name: Unit Tests
+    runs-on: macos-latest
+    needs: setup
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Homebrew Bundler RubyGems
+        id: cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ needs.setup.outputs.gems-path }}
+          key: ${{ runner.os }}-rubygems-${{ needs.setup.outputs.gems-hash }}
+          restore-keys: ${{ runner.os }}-rubygems-
+
+      - name: Install Homebrew Bundler RubyGems
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: brew install-bundler-gems
+
+      - name: Install Homebrew dependencies
+        run: env HOMEBREW_NO_AUTO_UPDATE=1 brew bundle
+
+      - name: Run Tests
+        shell: bash
+        run: sh ./.scripts/test.sh
+
+  report:
+    name: CI Summary
+    runs-on: macos-latest
+    if: always()
+    needs:
+      - lint
+      - format
+      - tests
+    steps:
+      - name: Report job results
+        run: |
+          echo "lint=${{ needs.lint.result }}"
+          echo "format=${{ needs.format.result }}"
+          echo "tests=${{ needs.tests.result }}"
+   

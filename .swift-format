@@ -1,6 +1,10 @@
 {
   "indentation": {
-    "tabs": 1
+    "tabs": 2
   },
-  "tabWidth": 4
+  "tabWidth": 4,
+  "multiElementCollectionTrailingCommas": false,
+  "OnlyOneTrailingClosureArgument": true,
+  "OneVariableDeclarationPerLine": true,
+  "lineLength": 120
 }
