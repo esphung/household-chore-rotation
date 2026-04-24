@@ -8,20 +8,20 @@
 import SwiftUI
 
 struct SectionHeader: View {
-	let title: String
-	let subtitle: String
+		let title: String
+		let subtitle: String
 
-	var body: some View {
-		VStack(alignment: .leading, spacing: 6) {
-			ThemedText(title, type: .screenTitle)
-			ThemedText(subtitle, type: .screenSubtitle)
+		var body: some View {
+				VStack(alignment: .leading, spacing: 6) {
+						ThemedText(title, type: .screenTitle)
+						ThemedText(subtitle, type: .screenSubtitle)
+				}
 		}
-	}
 }
 
 #Preview {
-	SectionHeader(
-		title: "Household Chores",
-		subtitle: "Keep your home routine fair and organized"
-	)
+		SectionHeader(
+				title: "Household Chores",
+				subtitle: "Keep your home routine fair and organized"
+		)
 }
